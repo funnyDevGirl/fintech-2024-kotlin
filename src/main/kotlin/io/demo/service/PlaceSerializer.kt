@@ -17,6 +17,7 @@ import kotlinx.serialization.json.jsonPrimitive
 @OptIn(ExperimentalSerializationApi::class)
 @Serializer(forClass = Place::class)
 object PlaceSerializer : KSerializer<Place> {
+
     override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("Place", PrimitiveKind.STRING)
 
     override fun deserialize(decoder: Decoder): Place {

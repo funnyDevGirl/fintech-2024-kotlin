@@ -15,30 +15,28 @@ import mu.KotlinLogging
 import java.io.File
 
 
-private val logger = KotlinLogging.logger {}
-
 class NewsService {
 
-    suspend fun getNews(count: Int = 100): List<News> {
+    private val logger = KotlinLogging.logger {}
 
-        val client = HttpClient(CIO) {
-            install(ContentNegotiation) {
-                json(Json {
-                    prettyPrint = true
-                    isLenient = true
-                    ignoreUnknownKeys = true
-                })
-            }
+    private val client = HttpClient(CIO) {
+        install(ContentNegotiation) {
+            json(Json {
+                ignoreUnknownKeys = true
+            })
         }
+    }
+
+    suspend fun getNews(count: Int = 100): List<News> {
 
         val pageSize = 100
         val totalPages = (count + pageSize - 1) / pageSize
         val newsList = mutableListOf<News>()
 
         for (page in 1..totalPages) {
-            logger.info("You have received page $page")
-
             try {
+                logger.info { "Fetching news for page $page with page size $pageSize" }
+
                 val response = client.get(
                     "https://kudago.com/public-api/v1.4/news/") {
                     parameter("location", "spb")
@@ -56,6 +54,8 @@ class NewsService {
                 val newsResponse = response.body<JsonObject>()
                 val newsArray = newsResponse["results"] as? JsonArray ?: continue
 
+                logger.info { "Fetched ${newsArray.size} news items from page $page" }
+
                 newsArray.forEach { jsonElement ->
                     val news = Json.decodeFromJsonElement<News>(jsonElement)
                     newsList.add(news)
@@ -67,6 +67,7 @@ class NewsService {
                 logger.error(e) { "Failed to fetch news for page $page" }
             }
         }
+        logger.info { "Returning ${newsList.size} news items" }
 
         return newsList.take(count)
     }
@@ -74,6 +75,9 @@ class NewsService {
     fun saveNews(filePath: String, news: Collection<News>) {
         val file = File(filePath)
         require(!file.exists()) { "File already exists at $filePath" }
+
+        logger.info { "Starting to save news to file $filePath" }
+        logger.info { "Number of news items to save: ${news.size}" }
 
         try {
             file.bufferedWriter().use { writer ->
@@ -83,11 +87,10 @@ class NewsService {
                         "${it.id},${it.title},${it.place?.title ?: "Неизвестно"},${it.description ?: "Неизвестно"},${it.siteUrl},${it.favoritesCount},${it.commentsCount},${it.publicationDate},${it.rating}\n")
                 }
             }
-            logger.info("You have successfully saved the data to file $file")
+            logger.info { "You have successfully saved the data to file $file" }
 
         } catch (e: Exception) {
-
-            logger.error("Failed to save to file $file", e)
+            logger.error(e) { "Failed to save to file $file with error: ${e.message}" }
         }
     }
 }
